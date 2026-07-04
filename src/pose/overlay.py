@@ -23,8 +23,12 @@ COLOR_TEXT = (255, 255, 255)
 COLOR_WARN = (60, 60, 230)        # red for "no detection"
 
 
-def render_overlay(video_path: str | Path, seq: PoseSequence, out_path: str | Path) -> Path:
-    """Draw the skeleton over each frame of the source video."""
+def render_overlay(video_path: str | Path, seq: PoseSequence, out_path: str | Path, events=None) -> Path:
+    """Draw the skeleton over each frame of the source video.
+
+    `events` (optional SwingEvents) adds swing-timeline banners: contact
+    window, speed peak, backswing apex, follow-through end.
+    """
     video_path, out_path = Path(video_path), Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -65,6 +69,22 @@ def render_overlay(video_path: str | Path, seq: PoseSequence, out_path: str | Pa
             label, label_color = f"frame {frame_pose.index}  NO DETECTION", COLOR_WARN
 
         cv2.putText(bgr, label, (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, label_color, 2, cv2.LINE_AA)
+
+        if events is not None:
+            i = frame_pose.index
+            w0, w1 = events.contact_window
+            banner = None
+            if i == events.contact_peak:
+                banner, banner_color = "CONTACT (speed peak)", COLOR_WARN
+            elif w0 <= i <= w1:
+                banner, banner_color = "contact window", COLOR_WARN
+            elif i == events.backswing_apex:
+                banner, banner_color = "backswing apex", COLOR_TEXT
+            elif i == events.follow_through_end:
+                banner, banner_color = "follow-through end", COLOR_TEXT
+            if banner:
+                cv2.putText(bgr, banner, (10, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.8, banner_color, 2, cv2.LINE_AA)
+
         writer.write(bgr)
 
     cap.release()

@@ -13,8 +13,24 @@ import sys
 from pathlib import Path
 
 from src.pose import PoseExtractor, render_overlay
+from src.pose.extractor import PoseSequence
+from src.segment import detect_events, render_speed_plot
 
 OUTPUT_DIR = Path("data/output")
+
+
+def _load_or_extract(path: Path, out_dir: Path) -> PoseSequence:
+    """Accept a video or a .pose.json; reuse cached keypoints when present."""
+    if path.suffix == ".json":
+        return PoseSequence.load(path)
+    cached = out_dir / f"{path.stem}.pose.json"
+    if cached.exists():
+        print(f"reusing cached keypoints: {cached}")
+        return PoseSequence.load(cached)
+    print(f"extracting pose from {path} ...")
+    seq = PoseExtractor().extract(path)
+    seq.save(cached)
+    return seq
 
 
 def cmd_extract(args: argparse.Namespace) -> int:
@@ -51,6 +67,36 @@ def cmd_extract(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_segment(args: argparse.Namespace) -> int:
+    path = Path(args.input)
+    if not path.exists():
+        print(f"error: not found: {path}")
+        return 1
+    out_dir = Path(args.out) if args.out else OUTPUT_DIR
+    stem = path.stem.removesuffix(".pose")
+
+    seq = _load_or_extract(path, out_dir)
+    events = detect_events(seq, side=args.hand)
+    print(events.summary())
+
+    plot_path = render_speed_plot(events, out_dir / f"{stem}.speed.png", title=stem)
+    print(f"  speed plot -> {plot_path}")
+
+    # Annotated overlay needs the source video; skip gracefully without it.
+    video = path if path.suffix != ".json" else Path(seq.source)
+    if video.exists() and video.suffix != ".json":
+        events_overlay = render_overlay(video, seq, out_dir / f"{stem}.events.mp4", events=events)
+        print(f"  events overlay -> {events_overlay}")
+    else:
+        print(f"  (source video not found at '{seq.source}' — skipping events overlay)")
+
+    if events.confidence == "low":
+        print("\nLOW CONFIDENCE — do not trust metrics from this clip; see reasons above.")
+    else:
+        print("\nCheck the plot and events overlay: is the marked contact window the actual hit?")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="badminton-ai-coach")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -59,6 +105,12 @@ def main() -> int:
     p_extract.add_argument("video", help="path to a clip (pre-trimmed to one shot)")
     p_extract.add_argument("--out", help=f"output directory (default: {OUTPUT_DIR})")
     p_extract.set_defaults(func=cmd_extract)
+
+    p_segment = sub.add_parser("segment", help="find backswing / contact window / follow-through")
+    p_segment.add_argument("input", help="video or .pose.json from extract")
+    p_segment.add_argument("--hand", choices=["right", "left"], default="right", help="racket hand")
+    p_segment.add_argument("--out", help=f"output directory (default: {OUTPUT_DIR})")
+    p_segment.set_defaults(func=cmd_segment)
 
     args = parser.parse_args()
     return args.func(args)

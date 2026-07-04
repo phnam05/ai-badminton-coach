@@ -21,3 +21,7 @@ models/*.task
 # OS
 Thumbs.db
 .DS_Store
+
+# Stray clips in repo root stay local
+/*.mp4
+/*.mov
