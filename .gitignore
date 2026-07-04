@@ -1,0 +1,23 @@
+# Virtual environment
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+
+# Data — clips and generated output stay local
+data/raw/
+data/output/
+data/reference/
+
+# MediaPipe model files (downloaded, not committed)
+models/*.task
+
+# OS
+Thumbs.db
+.DS_Store
