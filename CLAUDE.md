@@ -111,9 +111,11 @@ on sourcing a clean reference clip.
   coarse binary only.
 
 ## Status
-Setup (build step 1) complete: venv (Python 3.14), deps installed, folder structure,
-`tests/smoke_test.py` PASSING (33 landmarks detected on a real-person sample image).
-Next: Stage 1 — pose extraction + overlay video, checkpointed on the user's own clip.
+Setup complete (venv Python 3.14, deps, smoke test passing). Stage 1 (pose extraction)
+built and validated on a synthetic pan/zoom clip: `cli.py extract <video>` produces
+`<name>.pose.json` + `<name>.overlay.mp4` in `data/output/`, 100% detection on the test.
+PENDING: Stage 1 checkpoint on the user's real side-on clip (none filmed yet).
+Next: Stage 2 — contact-window detection from wrist speed.
 
 ## Working notes for Claude
 - Match surrounding code style once code exists. Keep modules decoupled around the
