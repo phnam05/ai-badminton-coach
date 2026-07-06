@@ -109,6 +109,12 @@ on sourcing a clean reference clip.
   and the report must say so to the user.
 - **Kinetic-chain timing (P14) is deferred** — unresolvable at 30fps; revisit at ≥60fps as a
   coarse binary only.
+- **Explain before writing (locked):** Before creating or editing any file, first
+  explain in plain language what the file will contain and why — simply and concisely,
+  quality over length, written so someone with little to no knowledge of this project
+  can still understand it. Then wait for the user's confirmation before writing. Do not
+  write code the user hasn't understood yet. Go one step at a time — don't jump ahead to
+  the next file until the current one is okayed.
 
 ## Status
 Setup complete (venv Python 3.14, deps, smoke test passing). Stage 1 (pose extraction)
