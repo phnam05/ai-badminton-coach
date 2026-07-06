@@ -14,7 +14,7 @@ from pathlib import Path
 
 from src.pose import PoseExtractor, render_overlay
 from src.pose.extractor import PoseSequence
-from src.segment import detect_events, render_speed_plot
+from src.segment import detect_events, render_speed_plot, review_clip
 
 OUTPUT_DIR = Path("data/output")
 
@@ -97,6 +97,36 @@ def cmd_segment(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_review(args: argparse.Namespace) -> int:
+    path = Path(args.input)
+    if not path.exists():
+        print(f"error: not found: {path}")
+        return 1
+    out_dir = Path(args.out) if args.out else OUTPUT_DIR
+    stem = path.stem.removesuffix(".pose")
+
+    seq = _load_or_extract(path, out_dir)
+    # The viewer shows real frames, so it needs the source video, not just keypoints.
+    video = path if path.suffix != ".json" else Path(seq.source)
+    if not video.exists() or video.suffix == ".json":
+        print(f"error: source video not found at '{seq.source}' — review needs the actual clip")
+        return 1
+
+    events = detect_events(seq, side=args.hand)
+    print(events.summary())
+    print("\nOpening viewer — step with arrow keys, press g on the true hit frame, q to quit.")
+
+    gt_path = out_dir / f"{stem}.groundtruth.json"
+    truth = review_clip(video, seq, events, gt_path)
+    if truth is not None:
+        off = events.contact_frame - truth
+        print(f"ground truth: frame {truth} (detector said {events.contact_frame}, "
+              f"off by {off:+d}) -> {gt_path}")
+    else:
+        print("no ground truth marked.")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="badminton-ai-coach")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -111,6 +141,12 @@ def main() -> int:
     p_segment.add_argument("--hand", choices=["right", "left"], default="right", help="racket hand")
     p_segment.add_argument("--out", help=f"output directory (default: {OUTPUT_DIR})")
     p_segment.set_defaults(func=cmd_segment)
+
+    p_review = sub.add_parser("review", help="step through detected events frame by frame; mark ground truth")
+    p_review.add_argument("input", help="video or .pose.json from extract")
+    p_review.add_argument("--hand", choices=["right", "left"], default="right", help="racket hand")
+    p_review.add_argument("--out", help=f"output directory (default: {OUTPUT_DIR})")
+    p_review.set_defaults(func=cmd_review)
 
     args = parser.parse_args()
     return args.func(args)

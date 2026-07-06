@@ -1,4 +1,4 @@
 from .extractor import PoseExtractor, PoseSequence, FramePose
-from .overlay import render_overlay
+from .overlay import annotate_frame, render_overlay
 
-__all__ = ["PoseExtractor", "PoseSequence", "FramePose", "render_overlay"]
+__all__ = ["PoseExtractor", "PoseSequence", "FramePose", "annotate_frame", "render_overlay"]
