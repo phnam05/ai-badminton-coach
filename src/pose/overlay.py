@@ -20,14 +20,17 @@ COLOR_BONE = (80, 220, 80)        # BGR green
 COLOR_JOINT = (60, 160, 255)      # BGR orange
 COLOR_LOW_VIS = (100, 100, 100)   # gray for uncertain joints
 COLOR_TEXT = (255, 255, 255)
-COLOR_WARN = (60, 60, 230)        # red for "no detection"
+COLOR_WARN = (60, 60, 230)        # red for "no detection" / low confidence
+COLOR_CONTACT = (60, 60, 230)     # red — the one suspected-hit frame
+COLOR_WINDOW = (60, 200, 255)     # amber — the other contact-window frames
 
 
 def render_overlay(video_path: str | Path, seq: PoseSequence, out_path: str | Path, events=None) -> Path:
     """Draw the skeleton over each frame of the source video.
 
-    `events` (optional SwingEvents) adds swing-timeline banners: contact
-    window, speed peak, backswing apex, follow-through end.
+    `events` (optional SwingEvents) adds swing-timeline banners: the suspected
+    hit frame, the rest of the contact window, the swing (speed peak), backswing
+    apex, and follow-through end — plus a persistent warning if confidence is low.
     """
     video_path, out_path = Path(video_path), Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -74,16 +77,23 @@ def render_overlay(video_path: str | Path, seq: PoseSequence, out_path: str | Pa
             i = frame_pose.index
             w0, w1 = events.contact_window
             banner = None
-            if i == events.contact_peak:
-                banner, banner_color = "CONTACT (speed peak)", COLOR_WARN
+            # Only the suspected-hit frame wears the word CONTACT; check it before
+            # the window range, since the hit frame is itself inside that range.
+            if i == events.contact_frame:
+                banner, banner_color = "CONTACT - suspected hit", COLOR_CONTACT
             elif w0 <= i <= w1:
-                banner, banner_color = "contact window", COLOR_WARN
+                banner, banner_color = "contact window", COLOR_WINDOW
+            elif i == events.speed_peak:
+                banner, banner_color = "swing (speed peak)", COLOR_TEXT
             elif i == events.backswing_apex:
                 banner, banner_color = "backswing apex", COLOR_TEXT
             elif i == events.follow_through_end:
                 banner, banner_color = "follow-through end", COLOR_TEXT
             if banner:
                 cv2.putText(bgr, banner, (10, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.8, banner_color, 2, cv2.LINE_AA)
+            if events.confidence == "low":
+                cv2.putText(bgr, "LOW CONFIDENCE - see report", (10, seq.height - 15),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, COLOR_WARN, 2, cv2.LINE_AA)
 
         writer.write(bgr)
 
