@@ -4,6 +4,9 @@ Analyzes a video of your badminton technique and gives coach-like feedback — s
 with the forehand smash and forehand slice. Built to stand in for a human coach when
 practicing alone.
 
+![Detected contact frame: skeleton overlay at the moment of maximum arm extension](docs/img/contact-frame.png)
+*Stage 2 output on a reference smash: the tracked skeleton at the detected contact frame — arm at maximum extension, shuttle just above the racket.*
+
 ## How it works
 
 **video → per-frame skeleton → view-invariant features → evaluation → coach feedback**
