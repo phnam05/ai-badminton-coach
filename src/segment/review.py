@@ -30,7 +30,8 @@ from ..pose.extractor import PoseSequence
 from ..pose.overlay import COLOR_CONTACT, COLOR_TEXT, COLOR_WINDOW, annotate_frame
 from .events import SwingEvents
 
-MAX_DISPLAY_WIDTH = 1280   # shrink display so tall phone clips fit on screen
+MAX_DISPLAY_WIDTH = 1280   # shrink display so wide/tall phone clips fit on screen
+MAX_DISPLAY_HEIGHT = 850   # leaves room for the strip, title bar, taskbar on 1080p
 JPEG_QUALITY = 90          # frames are held in memory JPEG-encoded (raw would be GBs)
 STRIP_HEIGHT = 56          # timeline strip below the video, px
 STRIP_MARGIN = 12
@@ -54,7 +55,7 @@ def _load_annotated_frames(video_path: Path, seq: PoseSequence, events: SwingEve
     if not cap.isOpened():
         raise IOError(f"Cannot open video: {video_path}")
 
-    scale = min(1.0, MAX_DISPLAY_WIDTH / seq.width)
+    scale = min(1.0, MAX_DISPLAY_WIDTH / seq.width, MAX_DISPLAY_HEIGHT / seq.height)
     encoded: list[np.ndarray] = []
     for frame_pose in seq.frames:
         ok, bgr = cap.read()
