@@ -6,12 +6,18 @@ Two separate questions, answered by two separate signals:
     A fast, above-the-shoulder wrist movement is a swing. The speed peak locates
     the swing in time; it is NOT contact (see below).
   * "Which frame is the HIT?"  -> ARM EXTENSION (wrist-to-shoulder distance over
-    torso length). Contact happens when the arm is stretched out to meet the
-    shuttle, so the suspected contact frame is the moment of maximum extension
-    near the swing. Wrist speed peaks BEFORE contact (whip on a smash) or is a
-    lull AT contact (a slice is deliberately decelerated), so speed alone
-    mistimes the hit — badly for slices. Extension is a geometric property of
-    contact itself and lands on it for both shots.
+    torso length), among OVERHEAD frames only. Contact happens when the arm is
+    stretched out to meet the shuttle, so the suspected contact frame is the
+    moment of maximum extension near the swing. Wrist speed peaks BEFORE contact
+    (whip on a smash) or is a lull AT contact (a slice is deliberately
+    decelerated), so speed alone mistimes the hit — badly for slices. Extension
+    is a geometric property of contact itself and lands on it for both shots.
+    The overhead restriction (wrist above shoulder) exists because raw extension
+    alone picks the FOLLOW-THROUGH on fast smashes: motion blur at the hit drags
+    the wrist landmark toward the body (depressing measured extension there),
+    while the slower, sharply-rendered downswing reads as fully extended — but
+    by then the wrist has dropped below the shoulder, which an overhead contact
+    by definition cannot have.
 
 Contact is anchored to a WINDOW, never a single frame — the 2D signals do not
 pin the exact hit, and one wrong frame would corrupt every scored metric
@@ -44,6 +50,9 @@ CONTACT_SEARCH_BACK_S = 0.12   # look for peak extension this far BEFORE the spe
 CONTACT_SEARCH_FWD_S = 0.22    # ... and this far after (contact sits on/just after the peak)
 WINDOW_EXTENSION_FRACTION = 0.95  # window = frames within this fraction of peak arm-extension
 WINDOW_MAX_HALF = 4            # hard cap on window half-width, frames
+WINDOW_MIN_HALF = 1            # window always spans >= +/-1 frame: blur at the hit depresses
+                               # measured extension, so the true frame is often the argmax's
+                               # neighbor (measured +/-1 on every ground-truth clip @60fps)
 APEX_SPEED_FRACTION = 0.3      # backswing apex = last lull below this before the peak
 FOLLOW_END_FRACTION = 0.2      # follow-through ends when speed stays below this
 PEAK_MEDIAN_RATIO_MIN = 3.0    # peak must stand this far above the clip's median speed
@@ -203,11 +212,19 @@ def detect_events(seq: PoseSequence, side: str = "right") -> SwingEvents:
             "(or split the clip) so a single contact can be scored"
         )
 
-    # --- suspected contact: max arm extension in a window around the swing ---
+    # --- suspected contact: max arm extension among OVERHEAD frames near the swing ---
+    # (see module docstring: unrestricted extension picks the follow-through on
+    # fast, motion-blurred smashes, several frames after the real hit)
     back = max(3, int(round(CONTACT_SEARCH_BACK_S * seq.fps)))
     fwd = max(4, int(round(CONTACT_SEARCH_FWD_S * seq.fps)))
     s0, s1 = max(0, speed_peak - back), min(n, speed_peak + fwd + 1)
-    contact_frame = s0 + int(np.argmax(extension[s0:s1]))
+    candidates = np.arange(s0, s1)
+    overhead_cand = candidates[wy[candidates] < sy[candidates]]  # image y grows downward
+    if len(overhead_cand):
+        contact_frame = int(overhead_cand[np.argmax(extension[overhead_cand])])
+    else:
+        contact_frame = s0 + int(np.argmax(extension[s0:s1]))
+        reasons.append("wrist never above the shoulder around the swing — contact frame is a guess")
 
     # --- contact window: contiguous frames at near-peak extension, hard-capped ---
     ext_thresh = extension[contact_frame] * WINDOW_EXTENSION_FRACTION
@@ -217,6 +234,10 @@ def detect_events(seq: PoseSequence, side: str = "right") -> SwingEvents:
     hi = contact_frame
     while hi < n - 1 and hi - contact_frame < WINDOW_MAX_HALF and extension[hi + 1] >= ext_thresh:
         hi += 1
+    # Blur can knock the true hit's extension below the plateau threshold, so
+    # never let the window collapse to fewer than +/-WINDOW_MIN_HALF frames.
+    lo = min(lo, max(0, contact_frame - WINDOW_MIN_HALF))
+    hi = max(hi, min(n - 1, contact_frame + WINDOW_MIN_HALF))
 
     # --- reliability near contact ---
     ctx_lo, ctx_hi = max(0, lo - 3), min(n, hi + 4)
