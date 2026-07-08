@@ -5,13 +5,14 @@ Stage 1 exposes `extract`: run pose estimation on a clip and produce
   - <name>.overlay.mp4 (skeleton overlay — eyeball this to verify tracking)
 
 Usage:
-  .venv\\Scripts\\python.exe cli.py extract data\\raw\\my_smash.mp4
+   extract data\\raw\\my_smash.mp4
 """
 
 import argparse
 import sys
 from pathlib import Path
 
+from src.metrics import compute_features, measure_contact, render_feature_sheet
 from src.pose import PoseExtractor, render_overlay
 from src.pose.extractor import PoseSequence
 from src.segment import detect_events, render_speed_plot, review_clip
@@ -127,6 +128,41 @@ def cmd_review(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_features(args: argparse.Namespace) -> int:
+    path = Path(args.input)
+    if not path.exists():
+        print(f"error: not found: {path}")
+        return 1
+    out_dir = Path(args.out) if args.out else OUTPUT_DIR
+    stem = path.stem.removesuffix(".pose")
+
+    seq = _load_or_extract(path, out_dir)
+    events = detect_events(seq, side=args.hand)
+    print(events.summary())
+    print()
+
+    features = compute_features(seq, handedness=args.hand)
+    contact = measure_contact(features, events)
+    print(contact.summary())
+
+    features_path = out_dir / f"{stem}.features.json"
+    features.save(features_path)
+    print(f"\n  features   -> {features_path}")
+
+    contact_path = out_dir / f"{stem}.contact.json"
+    contact.save(contact_path)
+    print(f"  at-contact -> {contact_path}")
+
+    sheet_path = render_feature_sheet(features, events, contact, out_dir / f"{stem}.features.png", title=stem)
+    print(f"  plot sheet -> {sheet_path}")
+
+    if contact.confidence == "low":
+        print("\nLOW CONFIDENCE — do not trust these numbers; see reasons above.")
+    else:
+        print("\nCheck the plot sheet against the overlay video: smooth curves, contact window on the real hit?")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="badminton-ai-coach")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -141,6 +177,12 @@ def main() -> int:
     p_segment.add_argument("--hand", choices=["right", "left"], default="right", help="racket hand")
     p_segment.add_argument("--out", help=f"output directory (default: {OUTPUT_DIR})")
     p_segment.set_defaults(func=cmd_segment)
+
+    p_features = sub.add_parser("features", help="normalized feature time series + at-contact metrics")
+    p_features.add_argument("input", help="video or .pose.json from extract")
+    p_features.add_argument("--hand", choices=["right", "left"], default="right", help="racket hand")
+    p_features.add_argument("--out", help=f"output directory (default: {OUTPUT_DIR})")
+    p_features.set_defaults(func=cmd_features)
 
     p_review = sub.add_parser("review", help="step through detected events frame by frame; mark ground truth")
     p_review.add_argument("input", help="video or .pose.json from extract")

@@ -117,11 +117,15 @@ on sourcing a clean reference clip.
   the next file until the current one is okayed.
 
 ## Status
-Setup complete (venv Python 3.14, deps, smoke test passing). Stage 1 (pose extraction)
-built and validated on a synthetic pan/zoom clip: `cli.py extract <video>` produces
-`<name>.pose.json` + `<name>.overlay.mp4` in `data/output/`, 100% detection on the test.
-PENDING: Stage 1 checkpoint on the user's real side-on clip (none filmed yet).
-Next: Stage 2 — contact-window detection from wrist speed.
+Setup + Stage 1 (pose extraction, `cli.py extract`) validated on real clips. Stage 2
+(contact window, `cli.py segment` / `cli.py review`) built and regression-verified:
+true contact inside the detected window on all 3 ground-truth clips (smash_1, smash_2,
+smash_coach_han), after the overhead-wrist fix for motion blur. Stage 3 (feature layer,
+`cli.py features`) built: `src/metrics/` produces `<name>.features.json` (per-frame
+series), `<name>.contact.json` (at-contact metrics), and `<name>.features.png` (plot
+sheet); left-hand mirroring round-trips exactly; runs HIGH confidence on all 5 clips.
+PENDING: Stage 3 checkpoint — user eyeballs the plot sheets against the overlays.
+Next: Stage 4a — coaching-principle rule engine in `src/evaluate/`.
 
 ## Working notes for Claude
 - Match surrounding code style once code exists. Keep modules decoupled around the
